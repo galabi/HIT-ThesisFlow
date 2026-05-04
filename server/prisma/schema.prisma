@@ -1,0 +1,417 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  SUPERVISOR
+  EXAMINER
+  PROJECT_COORDINATOR
+  FACULTY_SECRETARY
+}
+
+enum StudentLevel {
+  BSC_3
+  BSC_4
+  MSC_1
+}
+
+enum ProposalStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum ApplicationStatus {
+  PENDING
+  MEETING_REQUESTED
+  APPROVED
+  REJECTED
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  TERMINATED
+}
+
+enum MilestoneStatus {
+  PENDING
+  SUBMITTED
+  SUPERVISOR_GRADED
+  COORDINATOR_APPROVED
+  EXAMINER_ASSIGNED
+  EXAMINER_GRADED
+  COMPLETED
+}
+
+enum GradeFieldType {
+  NUMBER
+  RUBRIC
+  BOOLEAN
+  TEXT
+}
+
+enum DocumentType {
+  CV
+  TRANSCRIPT
+  RESEARCH_PROPOSAL
+  PROGRESS_REPORT
+  FINAL_REPORT
+  OTHER
+}
+
+enum NotificationType {
+  APPLICATION_SUBMITTED
+  APPLICATION_APPROVED
+  APPLICATION_REJECTED
+  MEETING_REQUESTED
+  PROJECT_STARTED
+  MILESTONE_SUBMITTED
+  MILESTONE_GRADED
+  MILESTONE_APPROVED
+  EXAMINER_ASSIGNED
+  DEFENSE_SCHEDULED
+  GRADE_FINALIZED
+  GENERAL
+}
+
+// ─── Users & Faculties ───────────────────────────────────────────────────────
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         Role
+  studentLevel StudentLevel?
+  isActive     Boolean      @default(true)
+  avatarUrl    String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  facultyMemberships   FacultyMember[]
+  supervisedProposals  Proposal[]            @relation("ProposalSupervisor")
+  applications         Application[]         @relation("StudentApplications")
+  studentProjects      ProjectStudent[]
+  supervisorProjects   Project[]             @relation("ProjectSupervisor")
+  coordinatedFaculties Faculty[]             @relation("FacultyCoordinator")
+  secretaryFaculties   Faculty[]             @relation("FacultySecretary")
+  gradeSubmissions     GradeSubmission[]
+  examinerAssignments  ExaminerAssignment[]
+  notifications        Notification[]
+  documents            Document[]
+  refreshTokens        RefreshToken[]
+}
+
+model Faculty {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  coordinatorId String?
+  coordinator   User?   @relation("FacultyCoordinator", fields: [coordinatorId], references: [id])
+  secretaryId   String?
+  secretary     User?   @relation("FacultySecretary", fields: [secretaryId], references: [id])
+
+  members          FacultyMember[]
+  proposals        Proposal[]
+  projects         Project[]
+  milestoneConfigs MilestoneConfig[]
+  milestoneWeights MilestoneWeight[]
+}
+
+model FacultyMember {
+  id        String   @id @default(cuid())
+  userId    String
+  facultyId String
+  joinedAt  DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  faculty Faculty @relation(fields: [facultyId], references: [id])
+
+  @@unique([userId, facultyId])
+}
+
+// ─── Proposals & Applications ────────────────────────────────────────────────
+
+model Proposal {
+  id           String         @id @default(cuid())
+  title        String
+  description  String         @db.Text
+  requirements String?        @db.Text
+  maxStudents  Int            @default(1)
+  status       ProposalStatus @default(DRAFT)
+  facultyId    String
+  supervisorId String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  closedAt     DateTime?
+
+  faculty      Faculty       @relation(fields: [facultyId], references: [id])
+  supervisor   User          @relation("ProposalSupervisor", fields: [supervisorId], references: [id])
+  applications Application[]
+  tags         ProposalTag[]
+}
+
+model ProposalTag {
+  id         String   @id @default(cuid())
+  proposalId String
+  label      String
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId])
+}
+
+model Application {
+  id               String            @id @default(cuid())
+  proposalId       String
+  studentId        String
+  status           ApplicationStatus @default(PENDING)
+  coverLetter      String?           @db.Text
+  meetingNote      String?
+  meetingScheduled DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  proposal  Proposal   @relation(fields: [proposalId], references: [id])
+  student   User       @relation("StudentApplications", fields: [studentId], references: [id])
+  documents Document[]
+
+  @@unique([proposalId, studentId])
+}
+
+// ─── Projects & Milestones ───────────────────────────────────────────────────
+
+model Project {
+  id           String        @id @default(cuid())
+  title        String
+  description  String?       @db.Text
+  status       ProjectStatus @default(ACTIVE)
+  facultyId    String
+  supervisorId String
+  proposalId   String?
+  startedAt    DateTime      @default(now())
+  completedAt  DateTime?
+  finalGrade   Float?
+
+  faculty    Faculty          @relation(fields: [facultyId], references: [id])
+  supervisor User             @relation("ProjectSupervisor", fields: [supervisorId], references: [id])
+  students   ProjectStudent[]
+  milestones Milestone[]
+}
+
+model ProjectStudent {
+  id        String @id @default(cuid())
+  projectId String
+  studentId String
+
+  project Project @relation(fields: [projectId], references: [id])
+  student User    @relation(fields: [studentId], references: [id])
+
+  @@unique([projectId, studentId])
+}
+
+model MilestoneConfig {
+  id                 String   @id @default(cuid())
+  facultyId          String
+  name               String
+  description        String?
+  order              Int
+  isRequired         Boolean  @default(true)
+  deadlineOffsetDays Int?
+  requiresExaminers  Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  faculty       Faculty            @relation(fields: [facultyId], references: [id])
+  milestones    Milestone[]
+  gradeTemplate GradeFormTemplate?
+  weights       MilestoneWeight[]
+
+  @@unique([facultyId, order])
+}
+
+model Milestone {
+  id                    String          @id @default(cuid())
+  projectId             String
+  configId              String
+  status                MilestoneStatus @default(PENDING)
+  deadline              DateTime?
+  submittedAt           DateTime?
+  supervisorGradedAt    DateTime?
+  coordinatorApprovedAt DateTime?
+  completedAt           DateTime?
+
+  project             Project              @relation(fields: [projectId], references: [id])
+  config              MilestoneConfig      @relation(fields: [configId], references: [id])
+  documents           Document[]
+  gradeSubmissions    GradeSubmission[]
+  examinerAssignments ExaminerAssignment[]
+  defenseExam         DefenseExam?
+
+  @@unique([projectId, configId])
+}
+
+// ─── Grading ─────────────────────────────────────────────────────────────────
+
+model GradeFormTemplate {
+  id        String   @id @default(cuid())
+  configId  String   @unique
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  config MilestoneConfig  @relation(fields: [configId], references: [id])
+  fields GradeFormField[]
+}
+
+model GradeFormField {
+  id         String         @id @default(cuid())
+  templateId String
+  label      String
+  fieldType  GradeFieldType
+  maxScore   Float
+  minScore   Float          @default(0)
+  weight     Float
+  order      Int
+  isRequired Boolean        @default(true)
+  helpText   String?
+
+  template    GradeFormTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  rubricItems RubricItem[]
+  responses   GradeFieldResponse[]
+}
+
+model RubricItem {
+  id      String @id @default(cuid())
+  fieldId String
+  label   String
+  score   Float
+
+  field GradeFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+}
+
+model GradeSubmission {
+  id          String   @id @default(cuid())
+  milestoneId String
+  graderId    String
+  role        Role
+  totalScore  Float
+  comments    String?  @db.Text
+  submittedAt DateTime @default(now())
+
+  milestone Milestone            @relation(fields: [milestoneId], references: [id])
+  grader    User                 @relation(fields: [graderId], references: [id])
+  responses GradeFieldResponse[]
+
+  @@unique([milestoneId, graderId])
+}
+
+model GradeFieldResponse {
+  id           String   @id @default(cuid())
+  submissionId String
+  fieldId      String
+  numericValue Float?
+  booleanValue Boolean?
+  textValue    String?  @db.Text
+
+  submission GradeSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  field      GradeFormField  @relation(fields: [fieldId], references: [id])
+}
+
+model MilestoneWeight {
+  id        String @id @default(cuid())
+  facultyId String
+  configId  String
+  weight    Float
+
+  faculty Faculty         @relation(fields: [facultyId], references: [id])
+  config  MilestoneConfig @relation(fields: [configId], references: [id])
+
+  @@unique([facultyId, configId])
+}
+
+model ExaminerAssignment {
+  id          String   @id @default(cuid())
+  milestoneId String
+  examinerId  String
+  assignedBy  String
+  assignedAt  DateTime @default(now())
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id])
+  examiner  User      @relation(fields: [examinerId], references: [id])
+
+  @@unique([milestoneId, examinerId])
+}
+
+model DefenseExam {
+  id          String   @id @default(cuid())
+  milestoneId String   @unique
+  scheduledAt DateTime
+  location    String?
+  meetingUrl  String?
+  createdAt   DateTime @default(now())
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id])
+}
+
+// ─── Supporting ──────────────────────────────────────────────────────────────
+
+model Document {
+  id           String       @id @default(cuid())
+  uploaderId   String
+  documentType DocumentType
+  fileName     String
+  storageKey   String       @unique
+  mimeType     String
+  sizeBytes    Int
+  uploadedAt   DateTime     @default(now())
+
+  applicationId String?
+  milestoneId   String?
+
+  uploader    User         @relation(fields: [uploaderId], references: [id])
+  application Application? @relation(fields: [applicationId], references: [id])
+  milestone   Milestone?   @relation(fields: [milestoneId], references: [id])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  actionUrl String?
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
