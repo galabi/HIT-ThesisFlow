@@ -12,10 +12,13 @@
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "lint": "eslint . --ext .js,.jsx --ignore-path .eslintignore",
     "format": "prettier --write \"**/*.{js,jsx,json,css,md}\"",
-    "db:migrate": "npm run prisma:migrate -w server",
+    "db:push": "npm run prisma:push -w server",
     "db:seed": "npm run prisma:seed -w server",
     "db:studio": "npm run prisma:studio -w server",
-    "test": "npm run test -w server"
+    "test": "npm run test -w server",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v && docker compose up -d"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

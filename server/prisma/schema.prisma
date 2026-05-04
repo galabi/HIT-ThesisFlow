@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
@@ -86,7 +86,7 @@ enum NotificationType {
 // ─── Users & Faculties ───────────────────────────────────────────────────────
 
 model User {
-  id           String       @id @default(cuid())
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
   email        String       @unique
   passwordHash String
   firstName    String
@@ -113,17 +113,17 @@ model User {
 }
 
 model Faculty {
-  id          String   @id @default(cuid())
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   code        String   @unique
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  coordinatorId String?
-  coordinator   User?   @relation("FacultyCoordinator", fields: [coordinatorId], references: [id])
-  secretaryId   String?
-  secretary     User?   @relation("FacultySecretary", fields: [secretaryId], references: [id])
+  coordinatorId String?  @db.ObjectId
+  coordinator   User?    @relation("FacultyCoordinator", fields: [coordinatorId], references: [id])
+  secretaryId   String?  @db.ObjectId
+  secretary     User?    @relation("FacultySecretary", fields: [secretaryId], references: [id])
 
   members          FacultyMember[]
   proposals        Proposal[]
@@ -133,9 +133,9 @@ model Faculty {
 }
 
 model FacultyMember {
-  id        String   @id @default(cuid())
-  userId    String
-  facultyId String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  facultyId String   @db.ObjectId
   joinedAt  DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id])
@@ -147,14 +147,14 @@ model FacultyMember {
 // ─── Proposals & Applications ────────────────────────────────────────────────
 
 model Proposal {
-  id           String         @id @default(cuid())
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
   title        String
-  description  String         @db.Text
-  requirements String?        @db.Text
+  description  String
+  requirements String?
   maxStudents  Int            @default(1)
   status       ProposalStatus @default(DRAFT)
-  facultyId    String
-  supervisorId String
+  facultyId    String         @db.ObjectId
+  supervisorId String         @db.ObjectId
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   closedAt     DateTime?
@@ -166,21 +166,21 @@ model Proposal {
 }
 
 model ProposalTag {
-  id         String   @id @default(cuid())
-  proposalId String
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  proposalId String @db.ObjectId
   label      String
 
-  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  proposal Proposal @relation(fields: [proposalId], references: [id])
 
   @@index([proposalId])
 }
 
 model Application {
-  id               String            @id @default(cuid())
-  proposalId       String
-  studentId        String
+  id               String            @id @default(auto()) @map("_id") @db.ObjectId
+  proposalId       String            @db.ObjectId
+  studentId        String            @db.ObjectId
   status           ApplicationStatus @default(PENDING)
-  coverLetter      String?           @db.Text
+  coverLetter      String?
   meetingNote      String?
   meetingScheduled DateTime?
   createdAt        DateTime          @default(now())
@@ -196,13 +196,13 @@ model Application {
 // ─── Projects & Milestones ───────────────────────────────────────────────────
 
 model Project {
-  id           String        @id @default(cuid())
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
   title        String
-  description  String?       @db.Text
+  description  String?
   status       ProjectStatus @default(ACTIVE)
-  facultyId    String
-  supervisorId String
-  proposalId   String?
+  facultyId    String        @db.ObjectId
+  supervisorId String        @db.ObjectId
+  proposalId   String?       @db.ObjectId
   startedAt    DateTime      @default(now())
   completedAt  DateTime?
   finalGrade   Float?
@@ -214,9 +214,9 @@ model Project {
 }
 
 model ProjectStudent {
-  id        String @id @default(cuid())
-  projectId String
-  studentId String
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  projectId String @db.ObjectId
+  studentId String @db.ObjectId
 
   project Project @relation(fields: [projectId], references: [id])
   student User    @relation(fields: [studentId], references: [id])
@@ -225,8 +225,8 @@ model ProjectStudent {
 }
 
 model MilestoneConfig {
-  id                 String   @id @default(cuid())
-  facultyId          String
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  facultyId          String   @db.ObjectId
   name               String
   description        String?
   order              Int
@@ -244,9 +244,9 @@ model MilestoneConfig {
 }
 
 model Milestone {
-  id                    String          @id @default(cuid())
-  projectId             String
-  configId              String
+  id                    String          @id @default(auto()) @map("_id") @db.ObjectId
+  projectId             String          @db.ObjectId
+  configId              String          @db.ObjectId
   status                MilestoneStatus @default(PENDING)
   deadline              DateTime?
   submittedAt           DateTime?
@@ -267,8 +267,8 @@ model Milestone {
 // ─── Grading ─────────────────────────────────────────────────────────────────
 
 model GradeFormTemplate {
-  id        String   @id @default(cuid())
-  configId  String   @unique
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  configId  String   @unique @db.ObjectId
   version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -278,8 +278,8 @@ model GradeFormTemplate {
 }
 
 model GradeFormField {
-  id         String         @id @default(cuid())
-  templateId String
+  id         String         @id @default(auto()) @map("_id") @db.ObjectId
+  templateId String         @db.ObjectId
   label      String
   fieldType  GradeFieldType
   maxScore   Float
@@ -289,27 +289,27 @@ model GradeFormField {
   isRequired Boolean        @default(true)
   helpText   String?
 
-  template    GradeFormTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  template    GradeFormTemplate    @relation(fields: [templateId], references: [id])
   rubricItems RubricItem[]
   responses   GradeFieldResponse[]
 }
 
 model RubricItem {
-  id      String @id @default(cuid())
-  fieldId String
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  fieldId String @db.ObjectId
   label   String
   score   Float
 
-  field GradeFormField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  field GradeFormField @relation(fields: [fieldId], references: [id])
 }
 
 model GradeSubmission {
-  id          String   @id @default(cuid())
-  milestoneId String
-  graderId    String
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  milestoneId String   @db.ObjectId
+  graderId    String   @db.ObjectId
   role        Role
   totalScore  Float
-  comments    String?  @db.Text
+  comments    String?
   submittedAt DateTime @default(now())
 
   milestone Milestone            @relation(fields: [milestoneId], references: [id])
@@ -320,21 +320,21 @@ model GradeSubmission {
 }
 
 model GradeFieldResponse {
-  id           String   @id @default(cuid())
-  submissionId String
-  fieldId      String
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  submissionId String   @db.ObjectId
+  fieldId      String   @db.ObjectId
   numericValue Float?
   booleanValue Boolean?
-  textValue    String?  @db.Text
+  textValue    String?
 
-  submission GradeSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submission GradeSubmission @relation(fields: [submissionId], references: [id])
   field      GradeFormField  @relation(fields: [fieldId], references: [id])
 }
 
 model MilestoneWeight {
-  id        String @id @default(cuid())
-  facultyId String
-  configId  String
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  facultyId String @db.ObjectId
+  configId  String @db.ObjectId
   weight    Float
 
   faculty Faculty         @relation(fields: [facultyId], references: [id])
@@ -344,10 +344,10 @@ model MilestoneWeight {
 }
 
 model ExaminerAssignment {
-  id          String   @id @default(cuid())
-  milestoneId String
-  examinerId  String
-  assignedBy  String
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  milestoneId String   @db.ObjectId
+  examinerId  String   @db.ObjectId
+  assignedBy  String   @db.ObjectId
   assignedAt  DateTime @default(now())
 
   milestone Milestone @relation(fields: [milestoneId], references: [id])
@@ -357,8 +357,8 @@ model ExaminerAssignment {
 }
 
 model DefenseExam {
-  id          String   @id @default(cuid())
-  milestoneId String   @unique
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  milestoneId String   @unique @db.ObjectId
   scheduledAt DateTime
   location    String?
   meetingUrl  String?
@@ -370,8 +370,8 @@ model DefenseExam {
 // ─── Supporting ──────────────────────────────────────────────────────────────
 
 model Document {
-  id           String       @id @default(cuid())
-  uploaderId   String
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  uploaderId   String       @db.ObjectId
   documentType DocumentType
   fileName     String
   storageKey   String       @unique
@@ -379,8 +379,8 @@ model Document {
   sizeBytes    Int
   uploadedAt   DateTime     @default(now())
 
-  applicationId String?
-  milestoneId   String?
+  applicationId String?  @db.ObjectId
+  milestoneId   String?  @db.ObjectId
 
   uploader    User         @relation(fields: [uploaderId], references: [id])
   application Application? @relation(fields: [applicationId], references: [id])
@@ -388,8 +388,8 @@ model Document {
 }
 
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String           @db.ObjectId
   type      NotificationType
   title     String
   body      String
@@ -404,9 +404,9 @@ model Notification {
 }
 
 model RefreshToken {
-  id        String    @id @default(cuid())
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
   token     String    @unique
-  userId    String
+  userId    String    @db.ObjectId
   expiresAt DateTime
   createdAt DateTime  @default(now())
   revokedAt DateTime?
