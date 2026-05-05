@@ -1,9 +1,12 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './ProtectedRoute.jsx';
+import { RoleGuard } from './RoleGuard.jsx';
 import { AppShell } from '../components/layout/AppShell.jsx';
 import { LoginPage } from '../pages/auth/LoginPage.jsx';
 import { RegisterPage } from '../pages/auth/RegisterPage.jsx';
 import { DashboardPage } from '../pages/dashboard/DashboardPage.jsx';
+import { FacultyConfigPage } from '../pages/admin/FacultyConfigPage.jsx';
+import { GradeFormBuilderPage } from '../pages/admin/GradeFormBuilderPage.jsx';
 
 export function AppRoutes() {
   return (
@@ -21,7 +24,24 @@ export function AppRoutes() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
-        {/* Additional routes will be added per phase */}
+
+        {/* Admin routes — PROJECT_COORDINATOR only */}
+        <Route
+          path="admin/faculty"
+          element={
+            <RoleGuard roles={['PROJECT_COORDINATOR']}>
+              <FacultyConfigPage />
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="admin/faculty/config/:configId/template"
+          element={
+            <RoleGuard roles={['PROJECT_COORDINATOR']}>
+              <GradeFormBuilderPage />
+            </RoleGuard>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
