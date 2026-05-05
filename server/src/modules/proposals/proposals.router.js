@@ -119,7 +119,7 @@ router.get('/:id', async (req, res, next) => {
   try {
     const proposal = await prisma.proposal.findUnique({
       where: { id: req.params.id },
-      include: { ...PROPOSAL_INCLUDE, requirements: true },
+      include: PROPOSAL_INCLUDE,
     });
     if (!proposal) throw new NotFoundError('Proposal not found');
     res.json(proposal);
