@@ -7,6 +7,10 @@ import { RegisterPage } from '../pages/auth/RegisterPage.jsx';
 import { DashboardPage } from '../pages/dashboard/DashboardPage.jsx';
 import { FacultyConfigPage } from '../pages/admin/FacultyConfigPage.jsx';
 import { GradeFormBuilderPage } from '../pages/admin/GradeFormBuilderPage.jsx';
+import { ProposalListPage } from '../pages/proposals/ProposalListPage.jsx';
+import { ProposalDetailPage } from '../pages/proposals/ProposalDetailPage.jsx';
+import { ProposalCreatePage } from '../pages/proposals/ProposalCreatePage.jsx';
+import { ApplicationsInboxPage } from '../pages/proposals/ApplicationsInboxPage.jsx';
 
 export function AppRoutes() {
   return (
@@ -24,6 +28,20 @@ export function AppRoutes() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+
+        {/* Proposals */}
+        <Route path="proposals" element={<ProposalListPage />} />
+        <Route path="proposals/new" element={
+          <RoleGuard roles={['SUPERVISOR']}>
+            <ProposalCreatePage />
+          </RoleGuard>
+        } />
+        <Route path="proposals/inbox" element={
+          <RoleGuard roles={['SUPERVISOR']}>
+            <ApplicationsInboxPage />
+          </RoleGuard>
+        } />
+        <Route path="proposals/:id" element={<ProposalDetailPage />} />
 
         {/* Admin routes — PROJECT_COORDINATOR only */}
         <Route

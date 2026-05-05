@@ -16,6 +16,7 @@ import { Role } from '@hit/shared';
 const navItems = [
   { label: 'לוח בקרה', href: '/dashboard', icon: LayoutDashboard, roles: null },
   { label: 'הצעות פרויקטים', href: '/proposals', icon: FileText, roles: null },
+  { label: 'תיבת מועמדויות', href: '/proposals/inbox', icon: FolderKanban, roles: [Role.SUPERVISOR] },
   { label: 'פרויקטים', href: '/projects', icon: FolderKanban, roles: null },
   { label: 'התראות', href: '/notifications', icon: Bell, roles: null },
   {
