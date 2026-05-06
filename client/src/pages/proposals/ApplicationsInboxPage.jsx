@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle, XCircle, CalendarClock, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, XCircle, CalendarClock, FileText, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useApplicationsInbox } from '../../hooks/useProposals.js';
 import { proposalsApi } from '../../api/proposals.api.js';
+import { documentsApi } from '../../api/documents.api.js';
 
 const STATUS_LABELS = {
   PENDING: 'ממתין',
@@ -167,9 +168,16 @@ function ApplicationRow({ app }) {
               <p className="text-xs font-medium text-muted-foreground mb-1">מסמכים:</p>
               <div className="flex flex-wrap gap-2">
                 {app.documents.map((doc) => (
-                  <span key={doc.id} className="flex items-center gap-1 text-xs bg-white border border-border px-2 py-1 rounded-md">
-                    <FileText size={11} /> {doc.fileName}
-                  </span>
+                  <button
+                    key={doc.id}
+                    onClick={async () => {
+                      const { url } = await documentsApi.download(doc.id);
+                      window.open(url, '_blank');
+                    }}
+                    className="flex items-center gap-1 text-xs bg-white border border-border px-2 py-1 rounded-md hover:bg-muted transition-colors"
+                  >
+                    <FileText size={11} /> {doc.fileName} <Download size={10} className="text-muted-foreground" />
+                  </button>
                 ))}
               </div>
             </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, FileText, CheckCircle, UserPlus, Trash2, CalendarClock, ExternalLink } from 'lucide-react';
+import { ArrowRight, FileText, CheckCircle, UserPlus, Trash2, CalendarClock, ExternalLink, Download } from 'lucide-react';
 import { useProject, useSubmitMilestone, useCoordinatorApprove, useSubmitGrade, useMyGrade } from '../../hooks/useProjects.js';
 import {
   useAssignments, useCreateAssignment, useDeleteAssignment,
@@ -8,6 +8,7 @@ import {
   useExaminers,
 } from '../../hooks/useAssignments.js';
 import { useAuthStore } from '../../store/auth.store.js';
+import { documentsApi } from '../../api/documents.api.js';
 import { FileUploadZone } from '../../components/documents/FileUploadZone.jsx';
 import { DynamicGradeForm } from '../../components/grades/DynamicGradeForm.jsx';
 
@@ -127,10 +128,20 @@ export function MilestoneDetailPage() {
             {milestone.documents.map((doc) => (
               <div key={doc.id} className="flex items-center gap-2 text-sm">
                 <FileText size={13} className="text-muted-foreground" />
-                <span>{doc.fileName}</span>
+                <span className="flex-1">{doc.fileName}</span>
                 <span className="text-xs text-muted-foreground">
                   {new Date(doc.uploadedAt).toLocaleDateString('he-IL')}
                 </span>
+                <button
+                  onClick={async () => {
+                    const { url } = await documentsApi.download(doc.id);
+                    window.open(url, '_blank');
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  title="הורד מסמך"
+                >
+                  <Download size={13} />
+                </button>
               </div>
             ))}
           </div>
