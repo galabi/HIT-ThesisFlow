@@ -32,6 +32,14 @@ export function createApp() {
   app.use(express.json());
   app.use(cookieParser());
 
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use('/api/v1', apiLimiter);
+
   app.use(
     '/api/v1/auth',
     rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardHeaders: true }),
