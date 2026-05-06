@@ -14,6 +14,7 @@ import { ApplicationsInboxPage } from '../pages/proposals/ApplicationsInboxPage.
 import { ProjectListPage } from '../pages/projects/ProjectListPage.jsx';
 import { ProjectDetailPage } from '../pages/projects/ProjectDetailPage.jsx';
 import { MilestoneDetailPage } from '../pages/projects/MilestoneDetailPage.jsx';
+import { NotificationsPage } from '../pages/notifications/NotificationsPage.jsx';
 
 export function AppRoutes() {
   return (
@@ -50,6 +51,9 @@ export function AppRoutes() {
         <Route path="projects" element={<ProjectListPage />} />
         <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="projects/:id/milestones/:milestoneId" element={<MilestoneDetailPage />} />
+
+        {/* Notifications */}
+        <Route path="notifications" element={<NotificationsPage />} />
 
         {/* Admin routes — PROJECT_COORDINATOR only */}
         <Route

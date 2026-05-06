@@ -45,6 +45,7 @@ export async function sendNotifications(notifications) {
       to: notification.user.email,
       subject: notification.title,
       html: notificationEmailHtml({
+        type: notification.type,
         title: notification.title,
         body: notification.body,
         actionUrl: notification.actionUrl,

@@ -2,9 +2,11 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar.jsx';
 import { TopBar } from './TopBar.jsx';
 import { useSocket } from '../../hooks/useSocket.js';
+import { useInitNotifications } from '../../hooks/useNotifications.js';
 
 export function AppShell() {
   useSocket();
+  useInitNotifications();
 
   return (
     <div className="flex h-screen overflow-hidden" dir="rtl">
