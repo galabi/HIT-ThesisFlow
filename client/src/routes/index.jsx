@@ -11,6 +11,9 @@ import { ProposalListPage } from '../pages/proposals/ProposalListPage.jsx';
 import { ProposalDetailPage } from '../pages/proposals/ProposalDetailPage.jsx';
 import { ProposalCreatePage } from '../pages/proposals/ProposalCreatePage.jsx';
 import { ApplicationsInboxPage } from '../pages/proposals/ApplicationsInboxPage.jsx';
+import { ProjectListPage } from '../pages/projects/ProjectListPage.jsx';
+import { ProjectDetailPage } from '../pages/projects/ProjectDetailPage.jsx';
+import { MilestoneDetailPage } from '../pages/projects/MilestoneDetailPage.jsx';
 
 export function AppRoutes() {
   return (
@@ -42,6 +45,11 @@ export function AppRoutes() {
           </RoleGuard>
         } />
         <Route path="proposals/:id" element={<ProposalDetailPage />} />
+
+        {/* Projects */}
+        <Route path="projects" element={<ProjectListPage />} />
+        <Route path="projects/:id" element={<ProjectDetailPage />} />
+        <Route path="projects/:id/milestones/:milestoneId" element={<MilestoneDetailPage />} />
 
         {/* Admin routes — PROJECT_COORDINATOR only */}
         <Route
