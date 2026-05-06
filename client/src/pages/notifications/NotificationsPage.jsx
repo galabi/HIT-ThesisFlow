@@ -14,7 +14,6 @@ const TYPE_ICON = {
   MILESTONE_APPROVED:    '✔️',
   EXAMINER_ASSIGNED:     '👤',
   DEFENSE_SCHEDULED:     '🗓️',
-  GRADE_FINALIZED:       '🏆',
   GENERAL:               '🔔',
 };
 

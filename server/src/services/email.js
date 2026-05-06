@@ -25,7 +25,6 @@ const TYPE_CONFIG = {
   MILESTONE_APPROVED:    { icon: '✔️', color: '#16a34a', label: 'אבן דרך אושרה' },
   EXAMINER_ASSIGNED:     { icon: '👤', color: '#0891b2', label: 'הוקצית כבוחן' },
   DEFENSE_SCHEDULED:     { icon: '🗓️', color: '#7c3aed', label: 'הגנה נקבעה' },
-  GRADE_FINALIZED:       { icon: '🏆', color: '#16a34a', label: 'ציון סופי' },
   GENERAL:               { icon: '🔔', color: '#64748b', label: 'הודעה' },
 };
 
