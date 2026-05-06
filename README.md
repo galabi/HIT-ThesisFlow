@@ -8,11 +8,12 @@ Manages the complete lifecycle — faculty proposal publishing → student appli
 ## Features
 
 - **Proposals** — supervisors publish project proposals; students browse, filter, and apply with CV/transcript uploads
-- **Applications** — supervisors review applications, approve/reject, or schedule meetings; approval automatically creates the project and all milestones
+- **Applications** — supervisors review, approve/reject, or schedule meetings; approval automatically creates the project and all milestones
 - **Milestones** — configurable per-faculty pipeline; each milestone has a dynamic grade form built by the coordinator
-- **Grading** — supervisors and examiners fill dynamic forms (NUMBER / RUBRIC / BOOLEAN / TEXT fields); weighted final grade calculated automatically
-- **Defense scheduling** — coordinator assigns examiners and schedules the defense exam
-- **Notifications** — every status change triggers an in-app notification (Socket.io) and an email (Resend)
+- **Grading** — supervisors and examiners fill dynamic forms (NUMBER / RUBRIC / BOOLEAN / TEXT); weighted final grade calculated automatically
+- **Examiner assignment** — coordinator assigns 2 examiners per milestone; milestone auto-transitions to `EXAMINER_ASSIGNED`
+- **Defense scheduling** — coordinator sets date/location/Zoom link; all parties notified automatically
+- **Notifications** — every status change triggers an in-app notification (Socket.io) + per-type HTML email (Resend)
 - **Multi-faculty** — each faculty has its own independently configured milestone pipeline and weight distribution
 
 ---
@@ -25,23 +26,23 @@ Manages the complete lifecycle — faculty proposal publishing → student appli
 | Backend | Node.js + Express (ESM) |
 | Database | MongoDB + Prisma ORM |
 | Auth | JWT (15 min) + httpOnly refresh cookie (7 days) |
-| UI | shadcn/ui components + Tailwind CSS (RTL) |
+| UI | shadcn/ui + Tailwind CSS (RTL, Hebrew) |
 | File Storage | Cloudflare R2 / AWS S3 via presigned URLs |
 | Local Storage | MinIO (Docker) |
 | Email | Resend |
 | Real-time | Socket.io |
-| Monorepo | npm workspaces |
+| Monorepo | npm workspaces (`shared`, `server`, `client`) |
 
 ---
 
 ## Prerequisites
 
-- Node.js ≥ 22
+- Node.js ≥ 20
 - Docker + Docker Compose
 
 ---
 
-## Getting Started
+## Getting Started (Development)
 
 ### 1. Clone and install
 
@@ -58,7 +59,7 @@ npm run docker:up
 ```
 
 MongoDB starts as a replica set (required for Prisma transactions).
-MinIO is available at `http://localhost:9001` (user: `minioadmin`, password: `minioadmin`).
+MinIO console is at `http://localhost:9001` (user: `minioadmin` / `minioadmin`).
 
 ### 3. Configure environment
 
@@ -69,7 +70,7 @@ cp server/.env.example server/.env
 Edit `server/.env`:
 
 ```env
-DATABASE_URL="mongodb://localhost:27017/hit-thesisflow?replicaSet=rs0&directConnection=true"
+DATABASE_URL="mongodb://localhost:27017/hit_thesisflow?replicaSet=rs0&directConnection=true"
 
 JWT_ACCESS_SECRET="change-me-at-least-32-chars-long"
 JWT_REFRESH_SECRET="change-me-at-least-32-chars-long"
@@ -85,9 +86,9 @@ S3_REGION="us-east-1"
 # RESEND_API_KEY="re_..."
 ```
 
-> **MinIO bucket setup:** open `http://localhost:9001`, log in, create a bucket named `hit-thesisflow`, and set its access policy to **public** (for presigned URL support).
+> **MinIO bucket setup:** open `http://localhost:9001`, log in, create a bucket named `hit-thesisflow`, and set its access policy to **public**.
 
-### 4. Push schema and seed the database
+### 4. Push schema and seed
 
 ```bash
 npm run db:push    # apply Prisma schema to MongoDB
@@ -97,10 +98,22 @@ npm run db:seed    # create 4 dev users
 ### 5. Run
 
 ```bash
-npm run dev        # starts server (port 5000) + client (port 5173) in parallel
+npm run dev        # server (port 5001) + client (port 5173) in parallel
 ```
 
 Open `http://localhost:5173`.
+
+---
+
+## Getting Started (Production — Docker)
+
+```bash
+cp server/.env.example server/.env   # fill JWT secrets + optional Resend key
+docker compose up --build
+```
+
+The app is available at `http://localhost` (port 80).
+The API server runs on port 5000 inside the compose network.
 
 ---
 
@@ -119,39 +132,47 @@ Open `http://localhost:5173`.
 
 ```
 hit-thesisflow/
-├── shared/                  # @hit/shared — enums, Zod validators, gradeCalculator
+├── shared/                    # @hit/shared — enums, Zod validators, gradeCalculator
 ├── server/
+│   ├── Dockerfile
 │   ├── prisma/
-│   │   ├── schema.prisma    # full DB schema
+│   │   ├── schema.prisma      # full DB schema
 │   │   └── seed.js
 │   └── src/
 │       ├── modules/
 │       │   ├── auth/
 │       │   ├── users/
-│       │   ├── faculties/   # faculty CRUD, milestone configs, weights
-│       │   ├── templates/   # grade form template builder
-│       │   ├── proposals/   # proposals + applications lifecycle
-│       │   ├── documents/   # presign / confirm / download
-│       │   ├── projects/    # (Phase 4)
-│       │   ├── grades/      # (Phase 4)
-│       │   └── notifications/
-│       ├── middleware/       # auth, rbac, error, validate
-│       └── services/        # email, socket, storage, token
+│       │   ├── faculties/     # faculty CRUD, milestone configs, weights
+│       │   ├── templates/     # grade form template builder
+│       │   ├── proposals/     # proposals + applications lifecycle
+│       │   ├── documents/     # presign / confirm / download
+│       │   ├── projects/      # project list, detail, milestone submit, coordinator approve
+│       │   ├── grades/        # grade submission, score calculation
+│       │   ├── milestones/    # examiner assignment
+│       │   ├── schedule/      # defense exam scheduling
+│       │   └── notifications/ # in-app notifications router + central service
+│       ├── middleware/        # auth, rbac, error, validate
+│       ├── services/          # email, socket, storage, token
+│       └── tests/             # integration tests (vitest + supertest)
 └── client/
+    ├── Dockerfile
+    ├── nginx.conf
     └── src/
-        ├── api/             # axios wrappers per domain
-        ├── hooks/           # TanStack Query hooks
+        ├── api/               # axios wrappers per domain
+        ├── hooks/             # TanStack Query hooks
         ├── pages/
         │   ├── auth/
         │   ├── dashboard/
-        │   ├── proposals/   # list, detail, create, inbox
-        │   ├── admin/       # faculty config, grade form builder
-        │   └── projects/    # (Phase 4)
+        │   ├── proposals/     # list, detail, create, inbox
+        │   ├── admin/         # faculty config, grade form builder
+        │   ├── projects/      # list, detail, milestone detail
+        │   └── notifications/ # full notification list
         ├── components/
-        │   ├── layout/      # AppShell, Sidebar, TopBar
-        │   ├── documents/   # FileUploadZone
-        │   └── grades/      # DynamicGradeForm (Phase 4)
-        └── store/           # Zustand: auth, notifications, ui
+        │   ├── layout/        # AppShell, Sidebar, TopBar
+        │   ├── documents/     # FileUploadZone
+        │   ├── grades/        # DynamicGradeForm
+        │   └── ErrorBoundary.jsx
+        └── store/             # Zustand: auth, notifications, ui
 ```
 
 ---
@@ -160,39 +181,42 @@ hit-thesisflow/
 
 | Prefix | Description |
 |---|---|
-| `POST /api/v1/auth/...` | Register, login, refresh, logout |
-| `GET/POST /api/v1/users` | User management |
-| `GET/POST/PATCH /api/v1/faculties/:id/...` | Faculty CRUD, milestone configs, weights |
-| `GET/PUT /api/v1/templates/:configId` | Grade form template builder |
-| `GET/POST /api/v1/proposals/...` | Proposal CRUD + publish/close |
-| `POST /api/v1/proposals/:id/applications/...` | Apply, approve, reject, request meeting |
-| `POST /api/v1/documents/presign` | Get presigned S3 PUT URL |
-| `POST /api/v1/documents/confirm` | Confirm upload, create Document record |
-| `GET /api/v1/documents/:id/download` | Get presigned GET URL |
-| `GET /api/v1/notifications` | In-app notifications |
+| `/api/v1/auth/...` | Register, login, refresh, logout, me |
+| `/api/v1/users` | User management (coordinator only) |
+| `/api/v1/faculties/:id/...` | Faculty CRUD, milestone configs, weights |
+| `/api/v1/templates/:configId` | Grade form template builder |
+| `/api/v1/proposals/...` | Proposal CRUD, publish/close, applications |
+| `/api/v1/documents/...` | Presign, confirm, download |
+| `/api/v1/projects/...` | Project list/detail, milestone submit, coordinator approve, grade summary |
+| `/api/v1/grades/milestones/:id` | Submit grade, get all grades, get my grade |
+| `/api/v1/assignments/...` | Examiner assignment CRUD |
+| `/api/v1/schedule/defense/...` | Defense exam scheduling CRUD |
+| `/api/v1/notifications/...` | List, mark read, mark all read |
+
+All routes under `/api/v1` are rate-limited to 200 req / 15 min.
+`/api/v1/auth` has a stricter limit of 30 req / 15 min.
 
 ---
 
-## Implementation Status
+## Running Tests
 
-| Phase | Scope | Status |
-|---|---|---|
-| 1 | Monorepo, auth, users, faculties, React shell | ✅ Done |
-| 2 | Faculty config, MilestoneConfig, GradeFormTemplate, Weights UI | ✅ Done |
-| 3 | Proposals, applications, document upload, notifications wired | ✅ Done |
-| 4 | Milestone submissions, DynamicGradeForm, supervisor grading | Pending |
-| 5 | Examiner assignment, defense scheduling, final grade | Pending |
-| 6 | Full notification audit, HTML email templates | Pending |
-| 7 | Rate limiting, Helmet, tests, Docker, production build | Pending |
+```bash
+npm run test -w server     # 15 integration tests (requires Docker MongoDB running)
+```
+
+Test suites: `auth.test.js` · `proposals.test.js` · `milestones.test.js`
 
 ---
+
 
 ## Key Design Decisions
 
-**Why MongoDB?** The grade form schema is dynamic (each faculty defines its own fields), and MongoDB's document model handles variable-depth embedded structures without migrations.
+**Why MongoDB?** The grade form schema is dynamic (each faculty defines its own fields), and MongoDB's document model handles variable-depth structures without migrations.
 
 **Why replica set in dev?** Prisma requires a MongoDB replica set to support multi-document transactions, which the notification pipeline uses.
 
 **File upload flow:** client → `POST /presign` → direct PUT to S3/MinIO → `POST /confirm`. The server never handles the file binary, keeping memory usage low and offloading bandwidth to the storage layer.
 
 **JWT refresh:** access token lives in Zustand (sessionStorage). On 401, the axios interceptor calls `POST /auth/refresh` (httpOnly cookie), updates the token, and retries the original request — transparent to all callers.
+
+**Notification pipeline:** `sendNotifications()` in `notifications.service.js` is the single entry point for all status changes. It persists `Notification` rows, emits `notification:new` via Socket.io, and fires per-type HTML emails — all in one call.
