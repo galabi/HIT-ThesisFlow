@@ -106,7 +106,7 @@ export function ProposalDetailPage() {
               <CloseButton proposalId={id} />
             )}
             <Link
-              to={`/proposals/${id}/applications`}
+              to="/proposals/inbox"
               className="text-sm px-3 py-1.5 border border-border rounded-md hover:bg-muted transition-colors"
             >
               הצג מועמדויות ({proposal._count?.applications ?? 0})

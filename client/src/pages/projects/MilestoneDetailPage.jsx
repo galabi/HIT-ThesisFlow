@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, FileText, CheckCircle } from 'lucide-react';
+import { ArrowRight, FileText, CheckCircle, UserPlus, Trash2, CalendarClock, ExternalLink } from 'lucide-react';
 import { useProject, useSubmitMilestone, useCoordinatorApprove, useSubmitGrade, useMyGrade } from '../../hooks/useProjects.js';
+import {
+  useAssignments, useCreateAssignment, useDeleteAssignment,
+  useDefense, useCreateDefense, useUpdateDefense, useDeleteDefense,
+  useExaminers,
+} from '../../hooks/useAssignments.js';
 import { useAuthStore } from '../../store/auth.store.js';
 import { FileUploadZone } from '../../components/documents/FileUploadZone.jsx';
 import { DynamicGradeForm } from '../../components/grades/DynamicGradeForm.jsx';
@@ -10,8 +15,9 @@ const STATUS_LABELS = {
   PENDING: 'ממתין להגשה',
   SUBMITTED: 'הוגש — ממתין לציון',
   SUPERVISOR_GRADED: 'ציון מנחה — ממתין לאישור',
-  COORDINATOR_APPROVED: 'אושר על ידי רכז',
+  COORDINATOR_APPROVED: 'אושר — ממתין לבוחנים',
   EXAMINER_ASSIGNED: 'בוחנים הוקצו',
+  DEFENSE_SCHEDULED: 'הגנה נקבעה',
   EXAMINER_GRADED: 'כל הציונים התקבלו',
   COMPLETED: 'הושלם',
 };
@@ -27,6 +33,8 @@ export function MilestoneDetailPage() {
   const { data: myGrade } = useMyGrade(
     ['SUPERVISOR', 'EXAMINER'].includes(user?.role) ? milestoneId : null
   );
+  const { data: assignments = [] } = useAssignments(milestoneId);
+  const { data: defense } = useDefense(milestoneId);
 
   const submitMutation = useSubmitMilestone(projectId, milestoneId);
   const approveMutation = useCoordinatorApprove(projectId, milestoneId);
@@ -41,6 +49,8 @@ export function MilestoneDetailPage() {
   const isStudent = user?.role === 'STUDENT';
   const isSupervisor = user?.role === 'SUPERVISOR' && project?.supervisorId === user?.id;
   const isCoordinator = user?.role === 'PROJECT_COORDINATOR';
+  const isExaminer =
+    user?.role === 'EXAMINER' && assignments.some((a) => a.examinerId === user?.id);
 
   const handleStudentSubmit = () => {
     submitMutation.mutate(
@@ -52,6 +62,10 @@ export function MilestoneDetailPage() {
   const handleGradeSubmit = (data) => {
     gradeMutation.mutate(data, { onSuccess: () => setShowGradeForm(false) });
   };
+
+  const coordinatorStages = ['COORDINATOR_APPROVED', 'EXAMINER_ASSIGNED', 'DEFENSE_SCHEDULED', 'EXAMINER_GRADED', 'COMPLETED'];
+  const showAssignPanel = isCoordinator && coordinatorStages.includes(milestone.status) && milestone.config?.requiresExaminers;
+  const showDefensePanel = isCoordinator && ['EXAMINER_ASSIGNED', 'DEFENSE_SCHEDULED', 'EXAMINER_GRADED', 'COMPLETED'].includes(milestone.status);
 
   return (
     <div className="p-6 space-y-5 max-w-2xl">
@@ -84,6 +98,24 @@ export function MilestoneDetailPage() {
           <p className="text-xs text-muted-foreground">
             הוגש: {new Date(milestone.submittedAt).toLocaleDateString('he-IL')}
           </p>
+        )}
+        {defense && (
+          <div className="mt-1 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 space-y-0.5">
+            <p className="font-semibold">
+              הגנה: {new Date(defense.scheduledAt).toLocaleString('he-IL')}
+            </p>
+            {defense.location && <p>מיקום: {defense.location}</p>}
+            {defense.meetingUrl && (
+              <a
+                href={defense.meetingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 underline hover:text-indigo-900"
+              >
+                <ExternalLink size={11} /> קישור לפגישה
+              </a>
+            )}
+          </div>
         )}
       </div>
 
@@ -217,6 +249,286 @@ export function MilestoneDetailPage() {
           )}
         </div>
       )}
+
+      {/* ── COORDINATOR: assign examiners ── */}
+      {showAssignPanel && (
+        <AssignExaminersPanel
+          milestoneId={milestoneId}
+          projectId={projectId}
+          assignments={assignments}
+        />
+      )}
+
+      {/* ── COORDINATOR: schedule defense ── */}
+      {showDefensePanel && (
+        <ScheduleDefensePanel
+          milestoneId={milestoneId}
+          projectId={projectId}
+          defense={defense}
+        />
+      )}
+
+      {/* ── EXAMINER: grade form ── */}
+      {isExaminer &&
+        ['EXAMINER_ASSIGNED', 'DEFENSE_SCHEDULED'].includes(milestone.status) &&
+        !myGrade && (
+          <div className="bg-white border border-border rounded-xl p-4 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold">מילוי טופס ציונים (בוחן)</h2>
+              <button
+                onClick={() => setShowGradeForm((v) => !v)}
+                className="text-xs text-primary hover:underline"
+              >
+                {showGradeForm ? 'סגור' : 'פתח טופס'}
+              </button>
+            </div>
+            {showGradeForm && (
+              <DynamicGradeForm
+                configId={milestone.config.id}
+                onSubmit={handleGradeSubmit}
+                isSaving={gradeMutation.isPending}
+                error={gradeMutation.error}
+              />
+            )}
+          </div>
+        )}
+
+      {isExaminer && myGrade && (
+        <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+          <p className="text-xs font-semibold text-muted-foreground mb-1">הציון שהגשת</p>
+          <p className="text-2xl font-bold text-primary">{myGrade.totalScore.toFixed(1)}</p>
+          {myGrade.comments && (
+            <p className="text-sm text-muted-foreground mt-1">{myGrade.comments}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Assign Examiners Panel ───────────────────────────────────────────────────
+
+function AssignExaminersPanel({ milestoneId, projectId, assignments }) {
+  const { data: examiners = [] } = useExaminers();
+  const createMutation = useCreateAssignment(projectId);
+  const deleteMutation = useDeleteAssignment(projectId, milestoneId);
+  const [selectedId, setSelectedId] = useState('');
+
+  const assignedIds = new Set(assignments.map((a) => a.examinerId));
+  const available = examiners.filter((e) => !assignedIds.has(e.id));
+
+  const handleAssign = () => {
+    if (!selectedId) return;
+    createMutation.mutate(
+      { milestoneId, examinerId: selectedId },
+      { onSuccess: () => setSelectedId('') }
+    );
+  };
+
+  return (
+    <div className="bg-white border border-border rounded-xl p-4 shadow-sm space-y-3">
+      <div className="flex items-center gap-2">
+        <UserPlus size={15} className="text-muted-foreground" />
+        <h2 className="text-sm font-semibold">הקצאת בוחנים</h2>
+        <span className="text-xs text-muted-foreground">({assignments.length}/2)</span>
+      </div>
+
+      {assignments.length > 0 && (
+        <div className="space-y-1">
+          {assignments.map((a) => (
+            <div key={a.id} className="flex items-center justify-between text-sm bg-slate-50 rounded-lg px-3 py-1.5">
+              <span>{a.examiner.firstName} {a.examiner.lastName}</span>
+              <button
+                onClick={() => deleteMutation.mutate(a.id)}
+                disabled={deleteMutation.isPending}
+                className="text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {assignments.length < 2 && (
+        <div className="flex gap-2">
+          <select
+            value={selectedId}
+            onChange={(e) => setSelectedId(e.target.value)}
+            className="input-base flex-1 text-sm"
+          >
+            <option value="">בחר בוחן...</option>
+            {available.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.firstName} {e.lastName}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleAssign}
+            disabled={!selectedId || createMutation.isPending}
+            className="bg-primary text-primary-foreground px-3 py-1.5 rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-60 transition-colors"
+          >
+            הוסף
+          </button>
+        </div>
+      )}
+
+      {assignments.length >= 2 && (
+        <p className="text-xs text-green-600 flex items-center gap-1">
+          <CheckCircle size={13} /> שני בוחנים הוקצו.
+        </p>
+      )}
+
+      {createMutation.isError && (
+        <p className="text-xs text-destructive">
+          {createMutation.error?.response?.data?.message || 'שגיאה בהקצאה'}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Schedule Defense Panel ───────────────────────────────────────────────────
+
+function ScheduleDefensePanel({ milestoneId, projectId, defense }) {
+  const createMutation = useCreateDefense(projectId, milestoneId);
+  const updateMutation = useUpdateDefense(projectId, milestoneId);
+  const deleteMutation = useDeleteDefense(projectId, milestoneId);
+
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    scheduledAt: '',
+    location: '',
+    meetingUrl: '',
+  });
+
+  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  const handleCreate = () => {
+    createMutation.mutate(
+      { milestoneId, ...form },
+      { onSuccess: () => setForm({ scheduledAt: '', location: '', meetingUrl: '' }) }
+    );
+  };
+
+  const handleUpdate = () => {
+    updateMutation.mutate(
+      { id: defense.id, ...form },
+      { onSuccess: () => setEditing(false) }
+    );
+  };
+
+  if (defense && !editing) {
+    return (
+      <div className="bg-white border border-border rounded-xl p-4 shadow-sm space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarClock size={15} className="text-muted-foreground" />
+            <h2 className="text-sm font-semibold">הגנה מתוזמנת</h2>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setForm({
+                  scheduledAt: defense.scheduledAt.slice(0, 16),
+                  location: defense.location ?? '',
+                  meetingUrl: defense.meetingUrl ?? '',
+                });
+                setEditing(true);
+              }}
+              className="text-xs text-primary hover:underline"
+            >
+              עריכה
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('לבטל את ההגנה?')) deleteMutation.mutate(defense.id);
+              }}
+              className="text-xs text-destructive hover:underline"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+        <p className="text-sm">{new Date(defense.scheduledAt).toLocaleString('he-IL')}</p>
+        {defense.location && <p className="text-xs text-muted-foreground">{defense.location}</p>}
+        {defense.meetingUrl && (
+          <a
+            href={defense.meetingUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-primary flex items-center gap-1 hover:underline"
+          >
+            <ExternalLink size={11} /> קישור לפגישה
+          </a>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-border rounded-xl p-4 shadow-sm space-y-3">
+      <div className="flex items-center gap-2">
+        <CalendarClock size={15} className="text-muted-foreground" />
+        <h2 className="text-sm font-semibold">{editing ? 'עדכון הגנה' : 'תיאום הגנה'}</h2>
+      </div>
+
+      <div className="space-y-2">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">תאריך ושעה</label>
+          <input
+            type="datetime-local"
+            className="input-base mt-0.5"
+            value={form.scheduledAt}
+            onChange={set('scheduledAt')}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">מיקום (אופציונלי)</label>
+          <input
+            type="text"
+            className="input-base mt-0.5"
+            value={form.location}
+            onChange={set('location')}
+            placeholder="חדר 301..."
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">קישור Zoom/Meet (אופציונלי)</label>
+          <input
+            type="url"
+            className="input-base mt-0.5"
+            value={form.meetingUrl}
+            onChange={set('meetingUrl')}
+            placeholder="https://..."
+          />
+        </div>
+      </div>
+
+      {(createMutation.isError || updateMutation.isError) && (
+        <p className="text-xs text-destructive">
+          {(createMutation.error || updateMutation.error)?.response?.data?.message || 'שגיאה'}
+        </p>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={editing ? handleUpdate : handleCreate}
+          disabled={!form.scheduledAt || createMutation.isPending || updateMutation.isPending}
+          className="bg-indigo-600 text-white px-4 py-1.5 rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 transition-colors"
+        >
+          {createMutation.isPending || updateMutation.isPending ? 'שומר...' : editing ? 'עדכן' : 'קבע הגנה'}
+        </button>
+        {editing && (
+          <button
+            onClick={() => setEditing(false)}
+            className="px-4 py-1.5 rounded-md text-sm border border-border hover:bg-muted transition-colors"
+          >
+            ביטול
+          </button>
+        )}
+      </div>
     </div>
   );
 }

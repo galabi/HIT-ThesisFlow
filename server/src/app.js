@@ -16,6 +16,8 @@ import proposalsRouter from './modules/proposals/proposals.router.js';
 import documentsRouter from './modules/documents/documents.router.js';
 import projectsRouter from './modules/projects/projects.router.js';
 import gradesRouter from './modules/grades/grades.router.js';
+import assignmentsRouter from './modules/milestones/assignments.router.js';
+import scheduleRouter from './modules/schedule/schedule.router.js';
 
 export function createApp() {
   const app = express();
@@ -44,6 +46,8 @@ export function createApp() {
   app.use('/api/v1/documents', documentsRouter);
   app.use('/api/v1/projects', projectsRouter);
   app.use('/api/v1/grades', gradesRouter);
+  app.use('/api/v1/assignments', assignmentsRouter);
+  app.use('/api/v1/schedule', scheduleRouter);
 
   app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

@@ -18,6 +18,7 @@ const MILESTONE_INCLUDE = {
   examinerAssignments: {
     include: { examiner: { select: { id: true, firstName: true, lastName: true } } },
   },
+  defenseExam: true,
 };
 
 // ── List ──────────────────────────────────────────────────────────────────────
